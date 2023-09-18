@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">NetworkDetection</string>
+    <string name="net_detection">网络检测</string>
 </resources>
