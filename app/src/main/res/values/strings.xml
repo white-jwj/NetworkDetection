@@ -1,4 +1,11 @@
 <resources>
     <string name="app_name">NetworkDetection</string>
     <string name="net_detection">网络检测</string>
+    <string name="checking">检测中...</string>
+    <string name="checked">检测完毕</string>
+    <string name="net_type">网络类型:</string>
+    <string name="net_type_init">未知</string>
+    <string name="net_type_WIFI">WIFI</string>
+    <string name="net_type_CELLULAR">蜂窝网络</string>
+    <string name="net_type_VPN">VPN</string>
 </resources>

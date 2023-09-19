@@ -10,17 +10,48 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:src="@drawable/connect"
+        android:layout_centerInParent="true"
+        android:layout_centerHorizontal="true"/>
+    <RelativeLayout
+        android:id="@+id/check_status_ll"
         android:layout_centerHorizontal="true"
-        android:layout_above="@+id/net_detection_bt"
-        android:layout_marginBottom="50dp"/>
+        android:layout_below="@id/net_connection_iv"
+        android:padding="20dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+        <TextView
+            android:id="@+id/check_status_tv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerHorizontal="true"
+            android:textColor="@color/blue"
+            android:text="@string/checking"/>
+        <TextView
+            android:id="@+id/net_type_title_tv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/net_type"
+            android:textColor="@color/blue"
+            android:layout_below="@+id/check_status_tv"/>
+        <TextView
+            android:id="@+id/net_type_result_tv"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/net_type_init"
+            android:textColor="@color/black"
+            android:layout_below="@+id/check_status_tv"
+            android:layout_marginStart="5dp"
+            android:layout_toEndOf="@+id/net_type_title_tv"/>
+    </RelativeLayout>
+
     <Button
         android:id="@+id/net_detection_bt"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/net_detection"
         android:background="@drawable/rounded_button"
-        android:layout_centerInParent="true"
-
+        android:layout_centerHorizontal="true"
+        android:layout_below="@id/check_status_ll"
         android:textColor="@color/blue"/>
 
 </RelativeLayout>

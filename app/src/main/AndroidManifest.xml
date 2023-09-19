@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -14,6 +16,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.NetworkDetection"
         tools:targetApi="31">
+        <service
+            android:name=".demo.NetworkService"
+            android:enabled="true"
+            android:exported="true">
+        </service>
+
         <activity
             android:name=".demo.MainActivity"
             android:exported="true">
