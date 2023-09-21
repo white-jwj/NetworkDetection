@@ -8,4 +8,6 @@
     <string name="net_type_WIFI">WIFI</string>
     <string name="net_type_CELLULAR">蜂窝网络</string>
     <string name="net_type_VPN">VPN</string>
+    <string name="net_service">网络检测服务</string>
+    <string name="check_init">未启动</string>
 </resources>

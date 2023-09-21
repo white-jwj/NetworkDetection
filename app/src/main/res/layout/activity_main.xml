@@ -5,6 +5,15 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".demo.MainActivity">
+    <Button
+        android:id="@+id/net_service_bt"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/rounded_button"
+        android:textColor="@color/blue"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="10dp"
+        android:text="@string/net_service"/>
     <ImageView
         android:id="@+id/net_connection_iv"
         android:layout_width="wrap_content"
@@ -25,7 +34,7 @@
             android:layout_height="wrap_content"
             android:layout_centerHorizontal="true"
             android:textColor="@color/blue"
-            android:text="@string/checking"/>
+            android:text="@string/check_init"/>
         <TextView
             android:id="@+id/net_type_title_tv"
             android:layout_width="wrap_content"
