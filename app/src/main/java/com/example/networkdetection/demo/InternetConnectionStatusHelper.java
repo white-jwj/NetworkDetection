@@ -1,10 +1,17 @@
 package com.example.networkdetection.demo;
 
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.ProxyInfo;
 import android.util.Log;
 import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.Proxy;
 import java.net.Socket;
+import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,15 +36,17 @@ public class InternetConnectionStatusHelper {
     private final String stage3 = "30min";
     private long maxWait = 1800;
     private final static String TYPE = "NET_TYPE";
-    private final static String CONNECT_RESULT ="CONNECT_RESULT";
+    private volatile ProxyInfo mProxy;
     ScheduledExecutorService netWorkScheduledExecutorService;
     private InternetConnectionStatusHelper(Context context) {
+        mProxy = null;
         result = new AtomicBoolean();
+        result.set(false);
         currentRetryCount = 0;
         this.context = context.getApplicationContext();
         listeners = new ArrayList<>();
         resultMap = new HashMap<>();
-        netWorkScheduledExecutorService = Executors.newScheduledThreadPool(3);
+        netWorkScheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     }
     public static synchronized InternetConnectionStatusHelper getInstance(Context context) {
         if (instance == null) {
@@ -46,34 +55,57 @@ public class InternetConnectionStatusHelper {
         return instance;
     }
     //DNS
-    private boolean isDnsServerReachable(String host) {
+    private  boolean isDnsServerReachable(String host) {
         Log.d(TAG, "isDnsServerReachable: "+host+":53");
         try {
-            Socket socket = new Socket();
+            Socket socket = new Socket();// 端口 ; 3 seconds timeout
             socket.connect(new InetSocketAddress(host, 53), 3000); // 端口 ; 3 seconds timeout
             socket.close();
             Log.d(TAG, "isDnsServerReachable: TRUE");
             return true;
-        } catch (IOException e) {
-            Log.d(TAG, "isDnsServerReachable: FALSE");
+        } catch (IOException | IllegalArgumentException e ) {
+            Log.d(TAG, "isDnsServerReachable: FALSE"+e.getMessage());
             return false;
         }
     }
+
+
     //Web
-    private boolean isWebServerReachable(String url) {
+    private  boolean isWebServerReachable(String url) {
         Log.d(TAG, "isWebServerReachable: "+url+":443");
         try {
-            Socket socket = new Socket();
-            socket.connect(new InetSocketAddress(url, 443), 3000); // 端口 ; 3 seconds timeout
-            socket.close();
-            Log.d(TAG, "isWebServerReachable: TRUE");
+            if (mProxy!=null){
+                url = "https://"+url+":443";
+                return webCheck(url);
+            }else {
+                Socket socket = new Socket();
+                socket.connect(new InetSocketAddress(url,443),3000);
+                socket.close();
+                return true;
+            }
+        } catch (IllegalArgumentException | IOException e) {
+            Log.d(TAG, "isWebServerReachable: FALSE");
+            return false;
+        }
+    }
+    private boolean webCheck(String url1){
+        try {
+            URL url = new URL(url1);
+            // 打开连接时传递代理对象（如果需要）
+            HttpURLConnection connection;
+            connection = (HttpURLConnection) url.openConnection();
+            // 置连接属性（例如请求方法、超时等）
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(3000);
+            // 发送请求
+            int responseCode = connection.getResponseCode();
             return true;
         } catch (IOException e) {
             Log.d(TAG, "isWebServerReachable: FALSE");
             return false;
         }
     }
-    private boolean checkingConnection() throws InterruptedException {
+    private synchronized boolean checkingConnection() throws InterruptedException {
         Log.d(TAG, "检测中");
         isChecking = true;
         notifyChecking();
@@ -81,37 +113,24 @@ public class InternetConnectionStatusHelper {
         List<String> dnsServers = new ArrayList<>();
         dnsServers.add("8.8.8.8");
         dnsServers.add("114.114.114.114");
-
         // Web服务器列表
         List<String> webServers = new ArrayList<>();
         webServers.add("google.com");
         webServers.add("baidu.com");
-
-        // 检测DNS服务器连通性
-        Thread thread = new Thread(()->{
-            for (String dnsServer : dnsServers) {
-                if (isDnsServerReachable(dnsServer)) {
-                    // 任意一个DNS服务器可达，继续Web服务器检测
-                    for (String webServer : webServers) {
-                        if (isWebServerReachable(webServer)) {
-                            // 任意一个Web服务器可达，互联网处于连通状态
-                            result.set(true);
-                            break;
-                        }else {
-                            result.set(false);
-                        }
-
+        for (String dnsServer : dnsServers) {
+            if (isDnsServerReachable(dnsServer)) {
+                // 任意一个DNS服务器可达，继续Web服务器检测
+                for (String webServer : webServers) {
+                    if (isWebServerReachable(webServer)) {
+                        // 任意一个Web服务器可达，互联网处于连通状态
+                        result.set(true);
+                        return true;
                     }
-                }else {
-                    result.set(false);
                 }
             }
-        });
-        thread.start();
-        thread.join();
-        resultMap.put(CONNECT_RESULT, String.valueOf(result.get()));
-        notifyChecked(resultMap);
-        return result.get();
+        }
+        result.set(false);
+        return false;
     }
     //用户手动触发
     public void triggerInternetConnectionStatusCheck() {
@@ -119,26 +138,31 @@ public class InternetConnectionStatusHelper {
             // 正在检测中 继续 返回最终结果
             Log.d(TAG, "等结果");
         }else {
-            netWorkScheduledExecutorService.shutdownNow();
-            // 非检测中 判断处于哪个阶段  30min的话重新开始 初始化
-            switch (checkStage){
-                case stage1:
-                case stage2:
-                    Log.d(TAG, "跳过等待 直接开始"+checkStage);
-                    checkInternetConnection();
-                    break;
-                case stage3:
-                    Log.d(TAG, "在最后一个空闲时间 重置条件 跳过等待 开始新一轮检测");
-                    currentRetryCount = 0;
-                    checkInternetConnection();
-                    break;
-                default:
-                    break;
-            }
+            new Thread(()->{
+                // 非检测中 判断处于哪个阶段  30min的话重新开始 初始化
+                switch (checkStage){
+                    case stage1:
+                    case stage2:
+                        Log.d(TAG, "跳过等待 直接开始"+checkStage);
+                        checkInternetConnection();
+                        break;
+                    case stage3:
+                        Log.d(TAG, "在最后一个空闲时间 重置条件 跳过等待 开始新一轮检测");
+                        currentRetryCount = 0;
+                        checkInternetConnection();
+                        break;
+                    default:
+                        break;
+                }
+        }).start();
         }
     }
+    public void checkConnection(){
+        new Thread(this::checkInternetConnection).start();
+    }
     //检测结果
-    public void checkInternetConnection() {
+    private void checkInternetConnection() {
+        setProxy();
         try{
             if (checkingConnection()) {
                 // 网络连通 回调通知
@@ -157,10 +181,10 @@ public class InternetConnectionStatusHelper {
                 long retryDelay = getRetryDelay(currentRetryCount);
                 netWorkScheduledExecutorService.schedule(()->checkInternetConnection(), retryDelay, TimeUnit.SECONDS);
                 notifyWaiting(retryDelay);
-                Log.d(TAG, "checkInternetConnection: 重测第 "+currentRetryCount+" 次");
             }
             if (currentRetryCount >= 3) {
                 // 达到最大重测次数 重置并回调通知
+                mProxy = null;
                 isChecking = false;
                 long retryDelay = getRetryDelay(currentRetryCount);
                 currentRetryCount = 0;
@@ -185,6 +209,7 @@ public class InternetConnectionStatusHelper {
     }
     public void setDisconnect(){
         resultMap.put(TYPE,"无连接");
+        result.set(false);
         notifyChecked(resultMap);
         isChecking = false;
         currentRetryCount = 0;
@@ -192,7 +217,14 @@ public class InternetConnectionStatusHelper {
         notifyWaiting(getRetryDelay(3));
         notifyConnectOff();
     }
-
+    public void setmProxy(ProxyInfo proxy){
+        mProxy = proxy;
+    }
+    private void setProxy(){
+        ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        ProxyInfo proxyInfo = connectivityManager.getDefaultProxy();
+        mProxy = proxyInfo;
+    }
     public void checkInternetConnection(String netType) {
         resultMap.put(TYPE,netType);
         checkInternetConnection();
