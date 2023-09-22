@@ -15,11 +15,6 @@ public class NetworkService extends Service {
     NetworkReceiver networkReceiver;
     @Override
     public void onCreate() {
-        /*IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
-        intentFilter.addAction("android.intent.action.PROXY_CHANGE");
-        networkReceiver = new NetworkReceiver();
-        registerReceiver(networkReceiver,intentFilter);*/
         IntentFilter intentFilter = new IntentFilter("android.intent.action.PROXY_CHANGE");
         networkReceiver = new NetworkReceiver();
         registerReceiver(networkReceiver,intentFilter);
