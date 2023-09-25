@@ -55,8 +55,15 @@ public class NetworkChange {
     NetworkRequest networkRequest = new NetworkRequest.Builder()
             .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
             .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build();
     ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback(){
+        @Override
+        public void onAvailable(@NonNull Network network) {
+            Log.d(TAG, "onCapabilitiesChanged:Network is available");
+            super.onAvailable(network);
+        }
+
         @Override
         public void onCapabilitiesChanged(@NonNull Network network, @NonNull NetworkCapabilities networkCapabilities) {
             Log.d(TAG, "onCapabilitiesChanged: has changed");
@@ -80,6 +87,7 @@ public class NetworkChange {
 
         @Override
         public void onLost(@NonNull Network network) {
+            Log.d(TAG, "onLost: 数据源变化->检测");
             isCellular = getMobileDataState();
             isProxy = getProxy(context);
             //wifi和数据流量开关

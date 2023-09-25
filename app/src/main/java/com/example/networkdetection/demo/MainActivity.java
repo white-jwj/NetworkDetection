@@ -34,16 +34,23 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         mainBinding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(mainBinding.getRoot());
+        //demo
         internetConnectionHelper = InternetConnectionStatusHelper.getInstance(this);
+        //启动服务
+        mainBinding.netServiceBt.setOnClickListener(view -> {
+            mainBinding.checkStatusTv.setText("服务启动");
+            //startService(new Intent(this,NetworkService.class));
+            /*debug
+             * 前台服务
+             **/
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(new Intent(this,MyForegroundService.class));
+            }
+        });
         //手动触发检测
         mainBinding.netDetectionBt.setOnClickListener(view -> {
             Log.d("InternetConnectionStatusHelper", "手动触发");
             internetConnectionHelper.triggerInternetConnectionStatusCheck();
-        });
-        //启动服务
-        mainBinding.netServiceBt.setOnClickListener(view -> {
-            mainBinding.checkStatusTv.setText("服务启动");
-            startService(new Intent(this,NetworkService.class));
         });
         internetConnectionHelper.addInternetConnectionListener(new InternetConnectionStatusHelper.InternetConnectionListener() {
             @Override
@@ -84,10 +91,5 @@ public class MainActivity extends AppCompatActivity {
         }else {
             mainBinding.netConnectionIv.setImageResource(R.drawable.disconnect);
         }
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
     }
 }

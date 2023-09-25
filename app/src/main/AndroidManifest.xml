@@ -8,7 +8,8 @@
     <uses-permission android:name="android.permission.MANAGE_DEVICE_POLICY_VPN" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -20,22 +21,27 @@
         android:theme="@style/Theme.NetworkDetection"
         tools:targetApi="31">
         <service
+            android:name=".demo.MyForegroundService"
+            android:enabled="true"
+            android:exported="true"></service>
+        <service
             android:name=".demo.NetworkService"
             android:enabled="true"
-            android:exported="true">
-        </service>
-        <receiver
+            android:exported="true"></service>
+        <!--
+<receiver
             android:name=".demo.NetworkReceiver"
-            android:enabled="true"
-            android:exported="true">
+            android:exported="true"
+            android:enabled="true">
             <intent-filter>
                 <action android:name="android.intent.action.PROXY_CHANGE"
                     tools:ignore="BatteryLife" />
             </intent-filter>
         </receiver>
-
+        -->
         <activity
             android:name=".demo.MainActivity"
+            android:autoRemoveFromRecents="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
