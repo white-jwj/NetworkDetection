@@ -12,30 +12,35 @@ import android.widget.Toast;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
+import java.util.Arrays;
 
 public class NetworkReceiver extends BroadcastReceiver {
     private PowerManager.WakeLock wakeLock;
+    private boolean lastProxy = false;
     @Override
     public void onReceive(Context context, Intent intent) {
         Log.d("NetworkChange", "onReceiveTest 代理接收器接收到了: "+ intent.getAction());
-        //wakelock 保持存活
+       /* //wakelock 保持存活
         PowerManager pm = (PowerManager) context.getApplicationContext().getSystemService(Context.POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "networkdetection:NetWakeLock");
-        wakeLock.acquire();
-
+        wakeLock.acquire();*/
         InternetConnectionStatusHelper internetConnectionStatusHelper = InternetConnectionStatusHelper.getInstance(context);
         ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        Log.d("NetworkChange", "onReceive: "+ Arrays.toString(connectivityManager.getAllNetworkInfo()));
         ProxyInfo proxyInfo = connectivityManager.getDefaultProxy();
         if (proxyInfo != null) {
-            String host = proxyInfo.getHost();
-            int port = proxyInfo.getPort();
-            Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(host, port));
-            internetConnectionStatusHelper.setmProxy(proxyInfo);
-            internetConnectionStatusHelper.checkConnection();
-            Log.d("NetworkChange", "onReceive has: 代理");
+            if (!lastProxy){
+                internetConnectionStatusHelper.setmProxy(proxyInfo);
+                internetConnectionStatusHelper.checkConnection("proxy");
+                lastProxy = true;
+                Log.d("NetworkChange", "onReceive has: 代理");
+            }
         }else {
-            internetConnectionStatusHelper.checkConnection();
-            Log.d("NetworkChange", "onReceive: 无代理");
+            if (lastProxy){
+                lastProxy = false;
+                internetConnectionStatusHelper.checkConnection("dis proxy");
+                Log.d("NetworkChange", "onReceive: 无代理");
+            }
         }
     }
 

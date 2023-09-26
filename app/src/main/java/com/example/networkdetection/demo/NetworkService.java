@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.ConnectivityManager;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.PowerManager;
@@ -18,14 +19,16 @@ public class NetworkService extends Service {
     private PowerManager.WakeLock wakeLock;
     @Override
     public void onCreate() {
-        IntentFilter intentFilter = new IntentFilter("android.intent.action.PROXY_CHANGE");
-        intentFilter.addAction("android.intent.action.PROXY_CHANGE");
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
         networkReceiver = new NetworkReceiver();
         registerReceiver(networkReceiver,intentFilter);
-        //wakelock 保持存活
+        WifiReceiver wifiReceiver = new WifiReceiver();
+        registerReceiver(wifiReceiver,new IntentFilter("android.net.wifi.STATE_CHANGE"));
+        /*//wakelock 保持存活
         PowerManager pm = (PowerManager) getApplicationContext().getSystemService(Context.POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "networkdetection:NetWakeLock");
-        wakeLock.acquire();
+        wakeLock.acquire();*/
         Log.d(TAG, "服务创建了");
         connectionStatusHelper = InternetConnectionStatusHelper.getInstance(this);
         networkChange = NetworkChange.getInstance(this);
@@ -35,7 +38,6 @@ public class NetworkService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "服务启动了: ");
         networkChange.startMonitor();
-
         return START_STICKY;
     }
 

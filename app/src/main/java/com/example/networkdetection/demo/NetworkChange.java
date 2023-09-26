@@ -20,11 +20,15 @@ public class NetworkChange {
     InternetConnectionStatusHelper connectionStatusHelper;
     private static NetworkChange instance;
     private final String TAG = "NetworkChange";
+    private boolean isFirst;
     private boolean isCellular;
     private boolean lastCellular;
     private boolean isProxy;
     private boolean lastProxy;
     private boolean lastWifi;
+    private boolean lastVpn;
+    private boolean isVpn;
+    private final String VPN = "VPN";
     WifiManager wifiManager;
     private final Context context;
     private NetworkChange(Context context) {
@@ -38,6 +42,9 @@ public class NetworkChange {
         isProxy = getProxy(context);
         lastProxy = getProxy(context);
         isProxy = false;
+        isVpn = false;
+        lastVpn = false;
+        isFirst = true;
         Log.d(TAG, "NetworkChange: 初始化 各个状态:"+ this);
     }
     public static synchronized NetworkChange getInstance(Context context){
@@ -51,6 +58,9 @@ public class NetworkChange {
         if (!isCellular&&!wifiManager.isWifiEnabled()){
             connectionStatusHelper.setDisconnect();
         }
+        connectivityManager.addDefaultNetworkActiveListener(() -> {
+            Log.d(TAG, "onCapabilitiesChanged isDefaultNetworkActive: "+connectivityManager.isDefaultNetworkActive());
+        });
     }
     NetworkRequest networkRequest = new NetworkRequest.Builder()
             .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
@@ -63,46 +73,58 @@ public class NetworkChange {
             Log.d(TAG, "onCapabilitiesChanged:Network is available");
             super.onAvailable(network);
         }
-
         @Override
         public void onCapabilitiesChanged(@NonNull Network network, @NonNull NetworkCapabilities networkCapabilities) {
-            Log.d(TAG, "onCapabilitiesChanged: has changed");
-            isCellular = getMobileDataState();
-            isProxy = getProxy(context);
-            if (isCellular!=lastCellular||isProxy!=lastProxy||wifiManager.isWifiEnabled()!=lastWifi){
-                Log.d(TAG, "onCapabilitiesChanged: 数据源变化->检测");
-                lastProxy = isProxy;
-                lastCellular = isCellular;
-                lastWifi = wifiManager.isWifiEnabled();
-                connectionStatusHelper.checkConnection();
-            }
-            //系统检测连通直接使用，若没连通自行检测
-            Log.d(TAG,networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)+"系统<--->上次检测 "+connectionStatusHelper.getCurrentInternetConnectionStatus());
-            if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)==connectionStatusHelper.getCurrentInternetConnectionStatus()){
-                connectionStatusHelper.setConnect();
+            Log.d(TAG, "onCapabilitiesChanged: getNetworkInfo: "+connectivityManager.getNetworkInfo(network));
+            if (isFirst){
+                connectionStatusHelper.checkConnection("第一次");
+                isFirst = false;
             }else {
-                connectionStatusHelper.checkConnection();
+                checkDetection(network);
+                //系统网络参数,检测连通,若没连通自行检测
+                if (!networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) || !networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+                    Log.d(TAG, "onCapabilitiesChanged 2: 数据源变化->检测");
+                    connectionStatusHelper.checkConnection("数据源变化 2");
+                }
             }
         }
-
         @Override
         public void onLost(@NonNull Network network) {
             Log.d(TAG, "onLost: 数据源变化->检测");
             isCellular = getMobileDataState();
             isProxy = getProxy(context);
+            if (connectivityManager.getNetworkInfo(network)!=null){
+                isVpn = connectivityManager.getNetworkInfo(network).getTypeName().equals(VPN);
+            }else {
+                isVpn = false;
+            }
             //wifi和数据流量开关
             if (!isCellular&&!wifiManager.isWifiEnabled()){
                 connectionStatusHelper.setDisconnect();
-            }else if (isCellular!=lastCellular||isProxy!=lastProxy||wifiManager.isWifiEnabled()!=lastWifi){
-                Log.d(TAG, "onCapabilitiesChanged: 数据源变化->检测");
-                lastProxy = isProxy;
-                lastCellular = isCellular;
-                lastWifi = wifiManager.isWifiEnabled();
-                connectionStatusHelper.checkConnection();
+            }else{
+                checkDetection(network);
             }
             super.onLost(network);
         }
     };
+    //系统网络参数变化 若数据、wifi、proxy开关没有改变则不进行检测
+    public void checkDetection(Network network){
+        isCellular = getMobileDataState();
+        isProxy = getProxy(context);
+        if (connectivityManager.getNetworkInfo(network)!=null){
+            isVpn = connectivityManager.getNetworkInfo(network).getTypeName().equals(VPN);
+        }else {
+            isVpn = false;
+        }
+        if (isCellular!=lastCellular||isProxy!=lastProxy||wifiManager.isWifiEnabled()!=lastWifi||isVpn!=lastVpn){
+            Log.d(TAG, "onCapabilitiesChanged : 数据源变化->检测 "+ NetworkChange.this);
+            lastProxy = isProxy;
+            lastCellular = isCellular;
+            lastWifi = wifiManager.isWifiEnabled();
+            lastVpn = isVpn;
+            connectionStatusHelper.checkConnection("数据源变化 ");
+        }
+    }
 
     //获取手机数据开关状态
     public boolean getMobileDataState() {
@@ -122,10 +144,7 @@ public class NetworkChange {
         ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         ProxyInfo proxyInfo = connectivityManager.getDefaultProxy();
         if (proxyInfo!=null){
-            String host = proxyInfo.getHost();
-            int port = proxyInfo.getPort();
-            Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(host, port));
-            connectionStatusHelper.setmProxy(proxyInfo);
+           connectionStatusHelper.setmProxy(proxyInfo);
             return true;
         }else {
             return false;
@@ -134,7 +153,6 @@ public class NetworkChange {
     public void onDestroy(){
         connectivityManager.unregisterNetworkCallback(networkCallback);
     }
-
     @Override
     public String toString() {
         return "NetworkChange{" +
@@ -143,6 +161,9 @@ public class NetworkChange {
                 ", isProxy=" + isProxy +
                 ", lastProxy=" + lastProxy +
                 ", lastWifi=" + lastWifi +
+                ", isWifi=" + wifiManager.isWifiEnabled()+
+                ", isVpn=" + isVpn+
+                ", lastVpn=" + lastVpn+
                 '}';
     }
 }

@@ -34,14 +34,16 @@ public class InternetConnectionStatusHelper {
     private final String stage1 = "30s";
     private final String stage2 = "1min";
     private final String stage3 = "30min";
-    private long maxWait = 1800;
+    private long maxWait = 1_800_000L;
     private final static String TYPE = "NET_TYPE";
     private volatile ProxyInfo mProxy;
+    private String FLAG = "NULL";
     ScheduledExecutorService netWorkScheduledExecutorService;
     private InternetConnectionStatusHelper(Context context) {
         mProxy = null;
         result = new AtomicBoolean();
         result.set(false);
+        isChecking = false;
         currentRetryCount = 0;
         this.context = context.getApplicationContext();
         listeners = new ArrayList<>();
@@ -64,7 +66,7 @@ public class InternetConnectionStatusHelper {
             Log.d(TAG, "isDnsServerReachable: TRUE");
             return true;
         } catch (IOException | IllegalArgumentException e ) {
-            Log.d(TAG, "isDnsServerReachable: FALSE"+e.getMessage());
+            Log.d(TAG, "isDnsServerReachable: FALSE "+e.getMessage());
             return false;
         }
     }
@@ -75,38 +77,24 @@ public class InternetConnectionStatusHelper {
         Log.d(TAG, "isWebServerReachable: "+url+":443");
         try {
             if (mProxy!=null){
-                url = "https://"+url+":443";
-                return webCheck(url);
+                Log.d(TAG, "isWebServerReachable: "+mProxy.toString());
+                Socket socket = new Socket(mProxy.getHost(),mProxy.getPort());
+                Log.d(TAG, "isWebServerReachable isConnected: "+socket.isConnected());
+                return socket.isConnected();
             }else {
                 Socket socket = new Socket();
                 socket.connect(new InetSocketAddress(url,443),3000);
+                Log.d(TAG, "isWebServerReachable: else "+socket.isConnected());
                 socket.close();
                 return true;
             }
         } catch (IllegalArgumentException | IOException e) {
-            Log.d(TAG, "isWebServerReachable: FALSE");
-            return false;
-        }
-    }
-    private boolean webCheck(String url1){
-        try {
-            URL url = new URL(url1);
-            // 打开连接时传递代理对象（如果需要）
-            HttpURLConnection connection;
-            connection = (HttpURLConnection) url.openConnection();
-            // 置连接属性（例如请求方法、超时等）
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(3000);
-            // 发送请求
-            int responseCode = connection.getResponseCode();
-            return true;
-        } catch (IOException e) {
-            Log.d(TAG, "isWebServerReachable: FALSE");
+            Log.d(TAG, "isWebServerReachable: FALSE "+e.getMessage());
             return false;
         }
     }
     private synchronized boolean checkingConnection() throws InterruptedException {
-        Log.d(TAG, "检测中");
+        Log.d(TAG, "检测中 = "+FLAG);
         isChecking = true;
         notifyChecking();
         // DNS服务器列表
@@ -117,6 +105,7 @@ public class InternetConnectionStatusHelper {
         List<String> webServers = new ArrayList<>();
         webServers.add("google.com");
         webServers.add("baidu.com");
+
         for (String dnsServer : dnsServers) {
             if (isDnsServerReachable(dnsServer)) {
                 // 任意一个DNS服务器可达，继续Web服务器检测
@@ -136,7 +125,7 @@ public class InternetConnectionStatusHelper {
     public void triggerInternetConnectionStatusCheck() {
         if (isChecking) {
             // 正在检测中 继续 返回最终结果
-            Log.d(TAG, "等结果");
+            waitResult();
         }else {
             new Thread(()->{
                 // 非检测中 判断处于哪个阶段  30min的话重新开始 初始化
@@ -144,11 +133,13 @@ public class InternetConnectionStatusHelper {
                     case stage1:
                     case stage2:
                         Log.d(TAG, "跳过等待 直接开始"+checkStage);
+                        FLAG = "stage1|2";
                         checkInternetConnection();
                         break;
                     case stage3:
                         Log.d(TAG, "在最后一个空闲时间 重置条件 跳过等待 开始新一轮检测");
                         currentRetryCount = 0;
+                        FLAG = "stage3";
                         checkInternetConnection();
                         break;
                     default:
@@ -157,11 +148,16 @@ public class InternetConnectionStatusHelper {
         }).start();
         }
     }
-    public void checkConnection(){
-        new Thread(this::checkInternetConnection).start();
+    public void checkConnection(String flag){
+        FLAG = flag;
+        if (isChecking){
+            waitResult();
+        }else {
+            new Thread(this::checkInternetConnection).start();
+        }
     }
     //检测结果
-    private void checkInternetConnection() {
+    private synchronized void checkInternetConnection() {
         setProxy();
         try{
             if (checkingConnection()) {
@@ -169,8 +165,9 @@ public class InternetConnectionStatusHelper {
                 isChecking = false;
                 checkStage = stage3;
                 currentRetryCount = 0;
-                Log.d(TAG, "checkInternetConnection: 连通");
-                netWorkScheduledExecutorService.schedule(()->checkInternetConnection(), getRetryDelay(3), TimeUnit.SECONDS);
+                FLAG = "Connection";
+                Log.d(TAG, "checkInternetConnection: 连通 等待时间: "+getRetryDelay(3)/1000);
+                netWorkScheduledExecutorService.schedule(this::checkInternetConnection, getRetryDelay(3), TimeUnit.MILLISECONDS);
                 notifyWaiting(getRetryDelay(3));
                 notifyConnectionOn();
             } else {
@@ -179,7 +176,8 @@ public class InternetConnectionStatusHelper {
                 currentRetryCount++;
                 //子线程耗时操作  ()
                 long retryDelay = getRetryDelay(currentRetryCount);
-                netWorkScheduledExecutorService.schedule(()->checkInternetConnection(), retryDelay, TimeUnit.SECONDS);
+                FLAG = "delay "+(retryDelay/1000);
+                netWorkScheduledExecutorService.schedule(this::checkInternetConnection, retryDelay, TimeUnit.MILLISECONDS);
                 notifyWaiting(retryDelay);
             }
             if (currentRetryCount >= 3) {
@@ -189,7 +187,7 @@ public class InternetConnectionStatusHelper {
                 long retryDelay = getRetryDelay(currentRetryCount);
                 currentRetryCount = 0;
                 //等30分钟 重复
-                netWorkScheduledExecutorService.schedule(()->checkInternetConnection(), retryDelay, TimeUnit.SECONDS);
+                FLAG = "Connect false";
                 Log.d(TAG, "checkInternetConnection: 没网");
                 notifyWaiting(retryDelay);
                 notifyConnectOff();
@@ -203,19 +201,21 @@ public class InternetConnectionStatusHelper {
         notifyChecked(resultMap);
         isChecking = false;
         currentRetryCount = 0;
-        netWorkScheduledExecutorService.schedule(()->checkInternetConnection(),getRetryDelay(3), TimeUnit.SECONDS);
+        netWorkScheduledExecutorService.schedule(this::checkInternetConnection,getRetryDelay(3), TimeUnit.MILLISECONDS);
         notifyWaiting(getRetryDelay(3));
         notifyConnectionOn();
     }
     public void setDisconnect(){
+        notifyWaiting(getRetryDelay(3));
+        notifyConnectOff();
         resultMap.put(TYPE,"无连接");
         result.set(false);
         notifyChecked(resultMap);
         isChecking = false;
         currentRetryCount = 0;
-        netWorkScheduledExecutorService.schedule(()->checkInternetConnection(),getRetryDelay(3), TimeUnit.SECONDS);
-        notifyWaiting(getRetryDelay(3));
-        notifyConnectOff();
+        FLAG = "setDisconnect";
+        Log.d(TAG, "setDisconnect: "+netWorkScheduledExecutorService.toString());
+        netWorkScheduledExecutorService.schedule(this::checkInternetConnection,getRetryDelay(3), TimeUnit.MILLISECONDS);
     }
     public void setmProxy(ProxyInfo proxy){
         mProxy = proxy;
@@ -225,12 +225,9 @@ public class InternetConnectionStatusHelper {
         ProxyInfo proxyInfo = connectivityManager.getDefaultProxy();
         mProxy = proxyInfo;
     }
-    public void checkInternetConnection(String netType) {
-        resultMap.put(TYPE,netType);
-        checkInternetConnection();
-    }
+
     private long getRetryDelay(int retryCount) {
-        long[] retryDelays = {30, 60, maxWait}; // 30 seconds, 1 minute, 30 minutes
+        long[] retryDelays = {30_000L, 60_000L, maxWait}; // 30 seconds, 1 minute, 30 minutes
         String[] stages = {stage1,stage2,stage3};
         // 根据重试次数选择对应的重试延迟
         if (retryCount >= 1 && retryCount <= retryDelays.length) {
@@ -241,8 +238,9 @@ public class InternetConnectionStatusHelper {
         checkStage = stages[stages.length - 1];
         return retryDelays[retryDelays.length - 1];
     }
-
-
+    private void waitResult(){
+        Log.d(TAG, "wait result");
+    }
     //检测结果
     public boolean getCurrentInternetConnectionStatus(){
         return result.get();

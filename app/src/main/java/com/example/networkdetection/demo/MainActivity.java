@@ -12,6 +12,7 @@ import android.net.ConnectivityManager;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
 import android.telephony.TelephonyManager;
 import android.util.Log;
@@ -24,28 +25,33 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.Socket;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class MainActivity extends AppCompatActivity {
     private final String TAG = "MainActivityNetWork";
     ActivityMainBinding mainBinding;
     InternetConnectionStatusHelper internetConnectionHelper;
+    private Handler handler;
+    private long time;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mainBinding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(mainBinding.getRoot());
+        handler = new Handler(getMainLooper());
         //demo
         internetConnectionHelper = InternetConnectionStatusHelper.getInstance(this);
         //启动服务
         mainBinding.netServiceBt.setOnClickListener(view -> {
             mainBinding.checkStatusTv.setText("服务启动");
-            //startService(new Intent(this,NetworkService.class));
+            startService(new Intent(this,NetworkService.class));
             /*debug
              * 前台服务
-             **/
+             **//*
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(new Intent(this,MyForegroundService.class));
-            }
+            }*/
         });
         //手动触发检测
         mainBinding.netDetectionBt.setOnClickListener(view -> {
@@ -80,7 +86,7 @@ public class MainActivity extends AppCompatActivity {
             }
             @Override
             public void onWaiting(long time) {
-                runOnUiThread(()->mainBinding.checkStatusTv.setText(String.valueOf(time)));
+                runOnUiThread(()->mainBinding.checkStatusTv.setText(String.valueOf(time/1000)));
             }
         });
     }
