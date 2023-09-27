@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -27,6 +29,7 @@ public class InternetConnectionStatusHelper {
     private final Context context;
     private final List<InternetConnectionListener> listeners;
     private boolean isChecking;
+    private boolean isWaiting;
     private static AtomicBoolean result;
     private int currentRetryCount;
     private final Map<String,String> resultMap; //Debug
@@ -44,6 +47,7 @@ public class InternetConnectionStatusHelper {
         result = new AtomicBoolean();
         result.set(false);
         isChecking = false;
+        isWaiting = false;
         currentRetryCount = 0;
         this.context = context.getApplicationContext();
         listeners = new ArrayList<>();
@@ -94,8 +98,9 @@ public class InternetConnectionStatusHelper {
         }
     }
     private synchronized boolean checkingConnection() throws InterruptedException {
-        Log.d(TAG, "检测中 = "+FLAG);
+        Log.d(TAG, "检测中 = "+FLAG+" 当前线程： "+Thread.currentThread().getName());
         isChecking = true;
+        isWaiting = false;
         notifyChecking();
         // DNS服务器列表
         List<String> dnsServers = new ArrayList<>();
@@ -151,9 +156,14 @@ public class InternetConnectionStatusHelper {
     public void checkConnection(String flag){
         FLAG = flag;
         if (isChecking){
+            netWorkScheduledExecutorService.shutdown();
             waitResult();
         }else {
-            new Thread(this::checkInternetConnection).start();
+            if (netWorkScheduledExecutorService.isShutdown()){
+                netWorkScheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+            }
+            //new Thread(this::checkInternetConnection).start();
+            netWorkScheduledExecutorService.schedule(this::checkInternetConnection,0,TimeUnit.SECONDS);
         }
     }
     //检测结果
@@ -161,29 +171,40 @@ public class InternetConnectionStatusHelper {
         setProxy();
         try{
             if (checkingConnection()) {
-                notifyWaiting(getRetryDelay(3));
                 notifyConnectionOn();
                 // 网络连通 回调通知
                 isChecking = false;
+                isWaiting = true;
                 checkStage = stage3;
                 currentRetryCount = 0;
                 FLAG = "Connect success";
                 Log.d(TAG, "checkInternetConnection: 连通 等待时间: "+getRetryDelay(3)/1000);
+                if (netWorkScheduledExecutorService.isShutdown()){
+                    netWorkScheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+                }
                 netWorkScheduledExecutorService.schedule(this::checkInternetConnection, getRetryDelay(3), TimeUnit.MILLISECONDS);
             } else {
                 // 网络未连通，延迟重新检测
+                Log.d(TAG, "isWaiting next: "+netWorkScheduledExecutorService.toString());
                 isChecking = false;
+                isWaiting = true;
                 currentRetryCount++;
                 //子线程耗时操作  ()
                 long retryDelay = getRetryDelay(currentRetryCount);
                 notifyWaiting(retryDelay);
                 FLAG = "delay "+(retryDelay/1000);
-                netWorkScheduledExecutorService.schedule(this::checkInternetConnection, retryDelay, TimeUnit.MILLISECONDS);
+                if (netWorkScheduledExecutorService.isShutdown()){
+                    netWorkScheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+                }
+                ScheduledFuture<?> schedule = netWorkScheduledExecutorService.schedule(this::checkInternetConnection, retryDelay, TimeUnit.MILLISECONDS);
+
+                Log.d(TAG, "isWaiting next: "+schedule);
             }
             if (currentRetryCount >= 3) {
                 // 达到最大重测次数 重置并回调通知
                 mProxy = null;
                 isChecking = false;
+                isWaiting = true;
                 long retryDelay = getRetryDelay(currentRetryCount);
                 currentRetryCount = 0;
                 //等30分钟 重复
@@ -198,7 +219,7 @@ public class InternetConnectionStatusHelper {
     }
     public void setConnect(){
         resultMap.put(TYPE,"连接");
-        notifyChecked(resultMap);
+        //notifyChecked(resultMap);
         isChecking = false;
         currentRetryCount = 0;
         netWorkScheduledExecutorService.schedule(this::checkInternetConnection,getRetryDelay(3), TimeUnit.MILLISECONDS);
@@ -206,11 +227,14 @@ public class InternetConnectionStatusHelper {
         notifyConnectionOn();
     }
     public void setDisconnect(){
+        if (netWorkScheduledExecutorService.isShutdown()){
+            netWorkScheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+        }
         notifyWaiting(getRetryDelay(3));
         notifyConnectOff();
         resultMap.put(TYPE,"无连接");
         result.set(false);
-        notifyChecked(resultMap);
+        //notifyChecked(resultMap);
         isChecking = false;
         currentRetryCount = 0;
         FLAG = "setDisconnect";
@@ -252,7 +276,7 @@ public class InternetConnectionStatusHelper {
         void onConnectionOn();//连通
         void onConnectOff();//未连通
         void onChecking();//Debug
-        void onChecked(Map<String,String> result);//Debug
+        //*void onChecked(Map<String,String> result);//Debug
         void onWaiting(long time);//Debug
     }
     public void addInternetConnectionListener(InternetConnectionListener listener) {
@@ -278,11 +302,11 @@ public class InternetConnectionStatusHelper {
             listener.onChecking();
         }
     }
-    private void notifyChecked(Map<String,String> result){
+    /*private void notifyChecked(Map<String,String> result){
         for (InternetConnectionListener listener : listeners) {
             listener.onChecked(result);
         }
-    }
+    }*/
     private void notifyWaiting(long time){
         for (InternetConnectionListener listener : listeners) {
             listener.onWaiting(time);

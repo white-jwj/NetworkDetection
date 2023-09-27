@@ -19,7 +19,7 @@ public class NetworkReceiver extends BroadcastReceiver {
     private boolean lastProxy = false;
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.d("NetworkChange", "onReceiveTest 代理接收器接收到了: "+ intent.getAction());
+        Log.d("NetworkChange", "onReceive 代理接收器接收到了: "+ intent.getAction());
        /* //wakelock 保持存活
         PowerManager pm = (PowerManager) context.getApplicationContext().getSystemService(Context.POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "networkdetection:NetWakeLock");
@@ -31,7 +31,7 @@ public class NetworkReceiver extends BroadcastReceiver {
         if (proxyInfo != null) {
             if (!lastProxy){
                 internetConnectionStatusHelper.setmProxy(proxyInfo);
-                internetConnectionStatusHelper.checkConnection("proxy");
+                internetConnectionStatusHelper.checkConnection("");
                 lastProxy = true;
                 Log.d("NetworkChange", "onReceive has: 代理");
             }

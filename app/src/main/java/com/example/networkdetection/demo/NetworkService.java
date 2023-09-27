@@ -16,22 +16,21 @@ public class NetworkService extends Service {
     private final String TAG = "NetworkChange";
     InternetConnectionStatusHelper connectionStatusHelper;
     NetworkChange networkChange;
-    BroadcastReceiver networkReceiver;
+    NetworkReceiver networkReceiver;
     private PowerManager.WakeLock wakeLock;
     @Override
     public void onCreate() {
-        IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
+        IntentFilter intentFilter = new IntentFilter("android.intent.action.PROXY_CHANGE");
         networkReceiver = new NetworkReceiver();
         registerReceiver(networkReceiver,intentFilter);
-        WifiReceiver wifiReceiver = new WifiReceiver();
+        /*WifiReceiver wifiReceiver = new WifiReceiver();
         IntentFilter intentFilter1 = new IntentFilter();
         intentFilter1.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
         intentFilter1.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
         intentFilter1.addAction(WifiManager.RSSI_CHANGED_ACTION);
         intentFilter1.addAction(WifiManager.SUPPLICANT_STATE_CHANGED_ACTION);
         intentFilter1.addAction(WifiManager.SUPPLICANT_CONNECTION_CHANGE_ACTION);
-        registerReceiver(wifiReceiver, intentFilter1);
+        registerReceiver(wifiReceiver, intentFilter1);*/
         /*//wakelock 保持存活
         PowerManager pm = (PowerManager) getApplicationContext().getSystemService(Context.POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "networkdetection:NetWakeLock");

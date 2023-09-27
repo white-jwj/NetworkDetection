@@ -11,7 +11,7 @@ import java.util.Arrays;
 public class WifiReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.d("NetworkChange", "WifiReceiver 代理接收器接收到了: "+ intent.getAction());
+        Log.d("NetworkChange", "WifiReceiver WIFI接收器接收到了: "+ intent.getAction());
         ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         Log.d("NetworkChange", "onReceive: "+ Arrays.toString(connectivityManager.getAllNetworkInfo()));
     }
