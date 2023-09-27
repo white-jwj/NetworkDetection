@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.ConnectivityManager;
+import android.net.wifi.WifiManager;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.PowerManager;
@@ -24,7 +25,13 @@ public class NetworkService extends Service {
         networkReceiver = new NetworkReceiver();
         registerReceiver(networkReceiver,intentFilter);
         WifiReceiver wifiReceiver = new WifiReceiver();
-        registerReceiver(wifiReceiver,new IntentFilter("android.net.wifi.STATE_CHANGE"));
+        IntentFilter intentFilter1 = new IntentFilter();
+        intentFilter1.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+        intentFilter1.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+        intentFilter1.addAction(WifiManager.RSSI_CHANGED_ACTION);
+        intentFilter1.addAction(WifiManager.SUPPLICANT_STATE_CHANGED_ACTION);
+        intentFilter1.addAction(WifiManager.SUPPLICANT_CONNECTION_CHANGE_ACTION);
+        registerReceiver(wifiReceiver, intentFilter1);
         /*//wakelock 保持存活
         PowerManager pm = (PowerManager) getApplicationContext().getSystemService(Context.POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "networkdetection:NetWakeLock");

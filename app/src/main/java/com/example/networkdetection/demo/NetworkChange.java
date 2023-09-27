@@ -16,8 +16,8 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 
 public class NetworkChange {
-    ConnectivityManager connectivityManager;
-    InternetConnectionStatusHelper connectionStatusHelper;
+    private final ConnectivityManager connectivityManager;
+    private final InternetConnectionStatusHelper connectionStatusHelper;
     private static NetworkChange instance;
     private final String TAG = "NetworkChange";
     private boolean isFirst;
@@ -29,7 +29,7 @@ public class NetworkChange {
     private boolean lastVpn;
     private boolean isVpn;
     private final String VPN = "VPN";
-    WifiManager wifiManager;
+    private final WifiManager wifiManager;
     private final Context context;
     private NetworkChange(Context context) {
         this.context = context;
@@ -100,6 +100,7 @@ public class NetworkChange {
             }
             //wifi和数据流量开关
             if (!isCellular&&!wifiManager.isWifiEnabled()){
+                lastCellular = isCellular;
                 connectionStatusHelper.setDisconnect();
             }else{
                 checkDetection(network);
@@ -116,7 +117,7 @@ public class NetworkChange {
         }else {
             isVpn = false;
         }
-        if (isCellular!=lastCellular||isProxy!=lastProxy||wifiManager.isWifiEnabled()!=lastWifi||isVpn!=lastVpn){
+        if (isCellular!=lastCellular||isProxy!=lastProxy||wifiManager.isWifiEnabled()||isVpn!=lastVpn){
             Log.d(TAG, "onCapabilitiesChanged : 数据源变化->检测 "+ NetworkChange.this);
             lastProxy = isProxy;
             lastCellular = isCellular;

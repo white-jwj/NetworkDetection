@@ -45,13 +45,24 @@ public class MainActivity extends AppCompatActivity {
         //启动服务
         mainBinding.netServiceBt.setOnClickListener(view -> {
             mainBinding.checkStatusTv.setText("服务启动");
-            startService(new Intent(this,NetworkService.class));
-            /*debug
+           //startService(new Intent(this,NetworkService.class));
+            /* debug
              * 前台服务
              **//*
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(new Intent(this,MyForegroundService.class));
             }*/
+            //debug
+            WifiReceiver wifiReceiver = new WifiReceiver();
+            IntentFilter intentFilter1 = new IntentFilter();
+            intentFilter1.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+            intentFilter1.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+            intentFilter1.addAction(WifiManager.RSSI_CHANGED_ACTION);
+            intentFilter1.addAction(WifiManager.SUPPLICANT_STATE_CHANGED_ACTION);
+            intentFilter1.addAction(WifiManager.SUPPLICANT_CONNECTION_CHANGE_ACTION);
+            registerReceiver(wifiReceiver, intentFilter1);
+            NetworkChange networkChange = NetworkChange.getInstance(this);
+            networkChange.startMonitor();
         });
         //手动触发检测
         mainBinding.netDetectionBt.setOnClickListener(view -> {

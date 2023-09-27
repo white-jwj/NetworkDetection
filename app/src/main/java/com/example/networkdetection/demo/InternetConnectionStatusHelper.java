@@ -161,24 +161,24 @@ public class InternetConnectionStatusHelper {
         setProxy();
         try{
             if (checkingConnection()) {
+                notifyWaiting(getRetryDelay(3));
+                notifyConnectionOn();
                 // 网络连通 回调通知
                 isChecking = false;
                 checkStage = stage3;
                 currentRetryCount = 0;
-                FLAG = "Connection";
+                FLAG = "Connect success";
                 Log.d(TAG, "checkInternetConnection: 连通 等待时间: "+getRetryDelay(3)/1000);
                 netWorkScheduledExecutorService.schedule(this::checkInternetConnection, getRetryDelay(3), TimeUnit.MILLISECONDS);
-                notifyWaiting(getRetryDelay(3));
-                notifyConnectionOn();
             } else {
                 // 网络未连通，延迟重新检测
                 isChecking = false;
                 currentRetryCount++;
                 //子线程耗时操作  ()
                 long retryDelay = getRetryDelay(currentRetryCount);
+                notifyWaiting(retryDelay);
                 FLAG = "delay "+(retryDelay/1000);
                 netWorkScheduledExecutorService.schedule(this::checkInternetConnection, retryDelay, TimeUnit.MILLISECONDS);
-                notifyWaiting(retryDelay);
             }
             if (currentRetryCount >= 3) {
                 // 达到最大重测次数 重置并回调通知
